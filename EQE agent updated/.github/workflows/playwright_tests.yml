@@ -1,0 +1,257 @@
+
+name: Playwright - Build and Test
+on:
+  # push:
+  #   branches:
+  #     - 'feature/jay' 
+
+  workflow_dispatch:
+    inputs:
+
+      test_file:
+        description: Path to the test file or directory to run
+        required: true
+        type: string
+        
+      test_env:
+        description: Target Test Environment
+        required: true
+        type: string
+
+      parallel_workers:
+        description: Number of parallel workers
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+  
+jobs:
+  build-and-test:
+    name: "Build and Test"
+    runs-on: 
+      group: EQE_PE_Team
+      labels: playwright
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env: 
+          JF_URL: ${{ vars.JF_SAAS_URL }}
+        with:
+          oidc-provider-name: ${{ secrets.JFrog_GH_OIDC_NAME }}
+          disable-auto-build-publish: true
+          disable-job-summary: true
+      
+      - name: Create Virtual Environment 
+        shell: powershell
+        run: python -m venv .venv
+
+      - name: Configure JFrog PIP Repository
+        shell: powershell
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          jf pip-config --repo-resolve shared-python-proxy
+      
+      - name: Install Dependencies
+        shell: powershell
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          jf pip install -r requirements.txt --quiet
+
+      - name: Install Playwright Chromium
+        shell: powershell
+        env:
+          PLAYWRIGHT_DOWNLOAD_HOST: https://cs215613%40caresource.com:${{ secrets.JF_API_TOKEN }}@caresource.pe.jfrog.io/artifactory/shared-playwright-azureedge
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          python -m playwright install chromium
+
+      - name: Verify Installed Versions
+        shell: powershell
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          python --version
+          pip --version
+          python -m pytest --version
+          python -m playwright --version
+
+      - name: Run Playwright Tests
+        shell: powershell
+        working-directory: ${{ github.workspace }}
+        run: |
+          .\.venv\Scripts\python.exe -m pytest .\${{ inputs.test_file }} -c .\pytest.ini --env=${{ inputs.test_env }} -n ${{ inputs.parallel_workers }} -vv
+      
+      - name: Display Execution Summary 
+        if: ${{ !cancelled() }}
+        shell: powershell
+        working-directory: ${{ github.workspace }}
+        run: |
+          $junitPath = "reports\junit.xml"
+          if (-not (Test-Path $junitPath)) {
+            Write-Host "::warning::JUnit XML report not found at $junitPath"
+            exit 0
+          }
+          [xml]$xml = Get-Content $junitPath
+          $suites = $xml.testsuites.testsuite
+          if (-not $suites) { $suites = @($xml.testsuite) }
+          $totalTests = 0; $totalPass = 0; $totalFail = 0; $totalSkip = 0; $totalError = 0; $totalTime = 0
+          $failures = @()
+          $allTestCases = @()
+          $sno = 0
+          foreach ($suite in $suites) {
+            $tests   = [int]$suite.tests
+            $fails   = [int]$suite.failures
+            $errors  = [int]$suite.errors
+            $skipped = [int]$suite.skipped
+            $time    = [double]$suite.time
+            $totalTests += $tests
+            $totalFail  += $fails
+            $totalError += $errors
+            $totalSkip  += $skipped
+            $totalTime  += $time
+            $totalPass  += ($tests - $fails - $errors - $skipped)
+            foreach ($tc in $suite.testcase) {
+              $sno++
+              $tcTime = if ($tc.time) { [Math]::Round([double]$tc.time, 2) } else { 0 }
+              if ($tc.failure) {
+                $tcStatus = ":x: Failed"
+                $msg = if ($tc.failure.message) { ($tc.failure.message -replace "`n"," ").Substring(0, [Math]::Min(200, $tc.failure.message.Length)) } else { "(no message)" }
+                $failures += [PSCustomObject]@{
+                  Test    = "$($tc.classname)::$($tc.name)"
+                  Message = $msg
+                }
+              } elseif ($tc.error) {
+                $tcStatus = ":boom: Error"
+                $msg = if ($tc.error.message) { ($tc.error.message -replace "`n"," ").Substring(0, [Math]::Min(200, $tc.error.message.Length)) } else { "(no message)" }
+                $failures += [PSCustomObject]@{
+                  Test    = "$($tc.classname)::$($tc.name)"
+                  Message = $msg
+                }
+              } elseif ($tc.skipped) {
+                $tcStatus = ":fast_forward: Skipped"
+              } else {
+                $tcStatus = ":white_check_mark: Passed"
+              }
+              $allTestCases += [PSCustomObject]@{
+                SNo      = $sno
+                Name     = $tc.name
+                Status   = $tcStatus
+                Duration = "${tcTime}s"
+              }
+            }
+          }
+          Write-Host ""
+          Write-Host "=========================================="
+          Write-Host "         TEST EXECUTION SUMMARY"
+          Write-Host "=========================================="
+          Write-Host "Total Tests : $totalTests"
+          Write-Host "Passed      : $totalPass"
+          Write-Host "Failed      : $totalFail"
+          Write-Host "Errors      : $totalError"
+          Write-Host "Skipped     : $totalSkip"
+          Write-Host "Duration    : $([Math]::Round($totalTime, 2))s"
+          Write-Host "=========================================="
+          if ($failures.Count -gt 0) {
+            Write-Host ""
+            Write-Host "::group::Failed Tests Details"
+            foreach ($f in $failures) {
+              Write-Host "::error::FAILED: $($f.Test) - $($f.Message)"
+            }
+            Write-Host "::endgroup::"
+          }
+          Write-Host ""
+          if ($totalFail -gt 0 -or $totalError -gt 0) {
+            Write-Host "::warning::$totalFail test(s) failed, $totalError error(s)"
+          } else {
+            Write-Host "All tests passed!"
+          }
+          # Write Job Summary (visible on the workflow run page)
+          $status = if ($totalFail -gt 0 -or $totalError -gt 0) { ":x: **FAILED**" } else { ":white_check_mark: **PASSED**" }
+          $lines = @()
+          $lines += "## $status Test Execution Summary"
+          $lines += ""
+          $lines += "| Metric | Count |"
+          $lines += "|--------|-------|"
+          $lines += "| Total Tests | $totalTests |"
+          $lines += "| :white_check_mark: Passed | $totalPass |"
+          $lines += "| :x: Failed | $totalFail |"
+          $lines += "| :boom: Errors | $totalError |"
+          $lines += "| :fast_forward: Skipped | $totalSkip |"
+          $lines += "| :stopwatch: Duration | $([Math]::Round($totalTime, 2))s |"
+          $lines += ""
+          $lines += "### Test Case Details"
+          $lines += ""
+          $lines += "| # | Test Case Name | Status | Duration |"
+          $lines += "|---|----------------|--------|----------|"
+          foreach ($t in $allTestCases) {
+            $escapedName = $t.Name -replace '\|', '\|'
+            $lines += "| $($t.SNo) | ``$escapedName`` | $($t.Status) | $($t.Duration) |"
+          }
+          if ($failures.Count -gt 0) {
+            $lines += ""
+            $lines += "### Failed Tests"
+            $lines += ""
+            $lines += "| Test | Message |"
+            $lines += "|------|---------|"
+            foreach ($f in $failures) {
+              $escapedMsg = $f.Message -replace '\|', '\|'
+              $lines += "| ``$($f.Test)`` | $escapedMsg |"
+            }
+          }
+          $markdown = $lines -join "`n"
+          # Print human-readable table to step log
+          Write-Host ""
+          Write-Host "=========================================="
+          Write-Host "         TEST CASE DETAILS"
+          Write-Host "=========================================="
+          Write-Host ("{0,-4} {1,-80} {2,-15} {3,-10}" -f "#", "Test Case Name", "Status", "Duration")
+          Write-Host ("{0,-4} {1,-80} {2,-15} {3,-10}" -f "---", ("-" * 80), ("-" * 15), ("-" * 10))
+          foreach ($t in $allTestCases) {
+            $shortName = if ($t.Name.Length -gt 77) { $t.Name.Substring(0,77) + "..." } else { $t.Name }
+            $plainStatus = $t.Status -replace ':x: ', '' -replace ':white_check_mark: ', '' -replace ':boom: ', '' -replace ':fast_forward: ', ''
+            Write-Host ("{0,-4} {1,-80} {2,-15} {3,-10}" -f $t.SNo, $shortName, $plainStatus, $t.Duration)
+          }
+          Write-Host "=========================================="
+          # Write to GitHub Job Summary
+          Write-Host ""
+          Write-Host "GITHUB_STEP_SUMMARY = $env:GITHUB_STEP_SUMMARY"
+          if ($env:GITHUB_STEP_SUMMARY) {
+            $markdown | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding ASCII
+            Write-Host "Job summary written to $env:GITHUB_STEP_SUMMARY"
+          } else {
+            Write-Host "::warning::GITHUB_STEP_SUMMARY is not set - summary table skipped"
+          }
+
+      # - name: Upload Test Report 
+      #   uses: actions/upload-artifact@v4
+      #   if: ${{ !cancelled() }}
+      #   with:
+      #     name: test-report
+      #     path: reports/
+      #     retention-days: 30
+      
+      - name: Publish Report to Network Path
+        if: ${{ !cancelled() }}
+        shell: powershell
+        working-directory: ${{ github.workspace }}
+        run: |
+          $dest = "\\day04\csmgdepts\IT\EQEPlatformEnablement\PlaywrightReports\${{ github.run_number }}"
+          robocopy .\reports $dest /E /R:3 /W:2 /NFL /NDL
+          if ($LASTEXITCODE -le 3) { $LASTEXITCODE = 0 }
+          
+      - name: Cleanup Old Reports from Network Path
+        if: ${{ !cancelled() }}
+        shell: powershell
+        run: |
+          $reportsRoot = "\\day04\csmgdepts\IT\EQEPlatformEnablement\PlaywrightReports"
+          $cutoffDate = (Get-Date).AddDays(-7)
+          Get-ChildItem -Path $reportsRoot -Directory | Where-Object { $_.CreationTime -lt $cutoffDate } | ForEach-Object {
+            Write-Host "Removing old report folder: $($_.FullName)"
+            Remove-Item -Path $_.FullName -Recurse -Force
+          }

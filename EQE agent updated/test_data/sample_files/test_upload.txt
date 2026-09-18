@@ -1,0 +1,4 @@
+OS = Any
+Image = Win7_Win8_IaaS_amd64_2.7.41491.1183_2510111183_GuestAgentPackage.zip
+Mode = IaaS
+BuildArchitecture = amd64

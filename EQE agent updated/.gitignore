@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.pytest_cache/
+
+# config/config.yaml is pushed with placeholder token only — real token must be set via Harness secrets
+
+# AAVA/qTest credentials — never commit
+Agent/aava_qtest_config.py
+
+# Authenticated browser sessions (storage state files with cookies/tokens)
+config/.auth/
+
+# Generated reports/logs (high churn)
+reports/
+logs/
+
+# Generated run details and caches
+Test_Latest_Run_Details/
+locators/self_healing_cache.json
+locators/self_healing_cache.tmp
+
+
+playwright/.cache/
+.history/
+.DS_Store
+.vscode/
+.idea/

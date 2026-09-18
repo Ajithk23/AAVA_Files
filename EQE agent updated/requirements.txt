@@ -1,0 +1,16 @@
+playwright
+pytest
+pytest-asyncio
+pytest-rerunfailures
+pytest-html
+pytest-xdist
+allure-pytest
+pyyaml
+streamlit
+pandas
+schedule
+croniter
+requests
+openpyxl
+psycopg
+psycopg-binary

@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  # ── Test runner ─────────────────────────────────────────────────────────────
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docuchat-qa:latest
+    container_name: docuchat-qa-runner
+    environment:
+      - ENV=${ENV:-qa}
+      - HEADLESS=true
+      - BASE_URL=${BASE_URL:-}
+      - TIMEOUT_MS=${TIMEOUT_MS:-15000}
+    volumes:
+      # Mount reports out so CI can publish them after the container exits
+      - ./reports:/app/reports
+    command: ["--env", "${ENV:-qa}", "-v", "--tb=short"]
+    network_mode: host        # allow access to on-prem corporate apps
+
+  # ── Streamlit dashboard (optional; run separately) ───────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docuchat-qa:latest
+    container_name: docuchat-qa-dashboard
+    entrypoint: ["python", "-m", "streamlit", "run", "dashboard/app.py",
+                 "--server.port=8501", "--server.headless=true"]
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./reports:/app/reports
+    profiles:
+      - dashboard                # start only with: docker-compose --profile dashboard up

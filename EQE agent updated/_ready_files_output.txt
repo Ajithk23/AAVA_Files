@@ -1,0 +1,49 @@
+Step 1: Navigating to DocuChat...
+  Immediate URL = https://caresource.okta.com/oauth2/default/v1/authorize?response_type=code&client_id=0oa22bad6kx1KdBbS0h8&redirect_uri=https%3A%2F%2Fdocu-chat.crt.ai.caresource.corp%2F.auth%2Flogin%2Fokta%2Fcallback&nonce=b3d4e7c75d9c4c0f8b763868553430a8_20260414083243&state=redir%3D%252F&scope=ai_groups+profile+openid+email+groups+offline_access
+Step 2: Waiting for auth redirect back to docu-chat...
+  Still on auth page after 45s ù URL = https://docu-chat.crt.ai.caresource.corp/ | Timeout 45000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "*docu-chat*" until 'load'
+  navigated to "https://caresource.okta.com/sso/idps/DSSO?stateTokenExternalId=aFFRSFlFU1Q2SjdBa1hkcU1GbWZscFU5anJBMTVsbGE4TnRwalZDZGdBL0JxOThHeEozNDRvdGN2cjJPWGMvZA"
+  navigated to "https://caresource.kerberos.okta.com/login/agentlessDsso/interact?precheck=false&interactionHandle=aFFRSFlFU1Q2SjdBa1hkcU1GbWZscFU5anJBMTVsbGE4TnRwalZDZGdBL0JxOThHeEozNDRvdGN2cjJPWGMvZA"
+  navigated to "https://caresource.okta.com/login/agentlessDsso/auth"
+  navigated to "https://caresource.okta.com/login/agentlessDsso/auth"
+  navigated to "https://docu-chat.crt.ai.caresource.corp/"
+============================================================
+  Page title = Pantheon - DocuChat
+  After render wait ù URL = https://docu-chat.crt.ai.caresource.corp/
+
+Step 3: stMultiSelect widgets found = 1
+  MultiSelect[0]: Select Ready Files to Include in Chat Context:  Choose options
+
+Step 4: Clicking each multiselect to read options...
+
+  Clicking MultiSelect[0]: Select Ready Files to Include in Chat Context:  Choose options
+  -> Screenshot saved: _dropdown_open.png
+  -> Scrollable/menu elements found in DOM:
+     {'tag': 'DIV', 'role': None, 'class': '', 'childCount': 1, 'scrollHeight': 640, 'clientHeight': 300, 'testid': None}
+     {'tag': 'DIV', 'role': None, 'class': '', 'childCount': 10, 'scrollHeight': 640, 'clientHeight': 640, 'testid': None}
+  -> Screenshot after JS scroll: _dropdown_scrolled.png
+  -> Total unique options found (after scrolling): 10
+     [01] 1.pptx
+     [02] .xml
+     [03] .xlsx
+     [04] .tiff
+     [05] Test.manifest
+     [06] Test 1.sql
+     [07] .csv
+     [08] .docx
+     [09] .html
+     [10] .bmp
+
+Step 5: Checking for stSelectbox widgets...
+  stSelectbox count: 3
+  Selectbox[0]: 
+  Selectbox[1]: 
+  Selectbox[2]: 
+
+Done. Closing browser.
+Navigating to DocuChat...
+
+Total multiselect widgets on page: 0
+Could not locate Ready Files dropdown.
