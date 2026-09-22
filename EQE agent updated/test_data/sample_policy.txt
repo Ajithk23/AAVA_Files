@@ -1,2 +1,0 @@
-This is a test PDF placeholder document for DocuChat upload validation.
-It simulates a policy document used in regression test scenarios.
